@@ -1,16 +1,10 @@
 import bcrypt from 'bcryptjs'
 import { prisma } from '@/lib/db'
 import { generateToken, type JWTPayload } from '@/lib/jwt'
-
-interface SignupData {
-  companyName: string
-  name: string
-  email: string
-  password: string
-}
+import type { SignupInput } from '@/lib/validations/auth'
 
 export class AuthService {
-  static async signup(data: SignupData) {
+  static async signup(data: SignupInput) {
     // Check if email already exists
     const existingUser = await prisma.user.findUnique({
       where: { email: data.email },
