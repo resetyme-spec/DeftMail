@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: deftmail-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: deftmail
+      POSTGRES_USER: deftmail
+      POSTGRES_PASSWORD: deftmail_pass
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U deftmail"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: deftmail-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  stalwart:
+    image: stalwartlabs/mail-server:latest
+    container_name: deftmail-stalwart
+    restart: unless-stopped
+    ports:
+      - "25:25"       # SMTP
+      - "587:587"     # Submission
+      - "143:143"     # IMAP
+      - "993:993"     # IMAPS
+      - "8080:8080"   # JMAP/Admin
+    volumes:
+      - stalwart-data:/opt/stalwart-mail/data
+      - ./config/stalwart:/opt/stalwart-mail/etc
+    environment:
+      - STALWART_HOSTNAME=mail.deftmail.local
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 25 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  postgres-data:
+    driver: local
+  redis-data:
+    driver: local
+  stalwart-data:
+    driver: local
+
+networks:
+  default:
+    name: deftmail-network

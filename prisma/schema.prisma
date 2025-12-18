@@ -1,0 +1,156 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Tenant {
+  id             String   @id @default(uuid())
+  companyName    String   @map("company_name")
+  ownerEmail     String   @unique @map("owner_email")
+  ownerName      String?  @map("owner_name")
+  plan           String   @default("starter") // starter, business, enterprise
+  status         String   @default("active") // active, suspended, cancelled
+  maxDomains     Int      @default(1) @map("max_domains")
+  maxUsersPerDomain Int   @default(10) @map("max_users_per_domain")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  users          User[]
+  domains        Domain[]
+  auditLogs      AuditLog[]
+
+  @@map("tenants")
+}
+
+model User {
+  id            String    @id @default(uuid())
+  tenantId      String    @map("tenant_id")
+  email         String    @unique
+  name          String?
+  passwordHash  String    @map("password_hash")
+  role          String    @default("owner") // owner, admin
+  emailVerified Boolean   @default(false) @map("email_verified")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  lastLoginAt   DateTime? @map("last_login_at")
+
+  // Relations
+  tenant        Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sessions      Session[]
+  auditLogs     AuditLog[]
+
+  @@index([tenantId])
+  @@index([email])
+  @@map("users")
+}
+
+model Session {
+  id           String   @id @default(uuid())
+  userId       String   @map("user_id")
+  refreshToken String   @unique @map("refresh_token")
+  expiresAt    DateTime @map("expires_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+  ipAddress    String?  @map("ip_address")
+  userAgent    String?  @map("user_agent")
+
+  // Relations
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([refreshToken])
+  @@map("sessions")
+}
+
+model Domain {
+  id                String    @id @default(uuid())
+  tenantId          String    @map("tenant_id")
+  domain            String
+  status            String    @default("pending") // pending, verified, active, failed
+  dkimSelector      String    @default("default") @map("dkim_selector")
+  dkimPublicKey     String?   @map("dkim_public_key")
+  dkimPrivateKey    String?   @map("dkim_private_key")
+  mxVerified        Boolean   @default(false) @map("mx_verified")
+  spfVerified       Boolean   @default(false) @map("spf_verified")
+  dkimVerified      Boolean   @default(false) @map("dkim_verified")
+  dmarcVerified     Boolean   @default(false) @map("dmarc_verified")
+  lastVerifiedAt    DateTime? @map("last_verified_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  tenant            Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  mailUsers         MailUser[]
+
+  @@unique([tenantId, domain])
+  @@index([tenantId])
+  @@index([status])
+  @@map("domains")
+}
+
+model MailUser {
+  id            String    @id @default(uuid())
+  tenantId      String    @map("tenant_id")
+  domainId      String    @map("domain_id")
+  email         String    @unique
+  displayName   String?   @map("display_name")
+  status        String    @default("active") // active, disabled, suspended
+  passwordHash  String?   @map("password_hash")
+  quotaMb       Int       @default(1024) @map("quota_mb") // 1GB default
+  usedQuotaMb   Int       @default(0) @map("used_quota_mb")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  lastLoginAt   DateTime? @map("last_login_at")
+
+  // Relations
+  domain        Domain    @relation(fields: [domainId], references: [id], onDelete: Cascade)
+  rateLimits    RateLimit[]
+
+  @@index([tenantId])
+  @@index([domainId])
+  @@index([email])
+  @@map("mail_users")
+}
+
+model RateLimit {
+  id            String   @id @default(uuid())
+  mailUserId    String?  @map("mail_user_id")
+  domainId      String?  @map("domain_id")
+  limitType     String   @map("limit_type") // daily_send, hourly_send
+  currentCount  Int      @default(0) @map("current_count")
+  maxLimit      Int      @map("max_limit")
+  resetAt       DateTime @map("reset_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  // Relations
+  mailUser      MailUser? @relation(fields: [mailUserId], references: [id], onDelete: Cascade)
+
+  @@index([mailUserId])
+  @@index([resetAt])
+  @@map("rate_limits")
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  userId    String?  @map("user_id")
+  action    String   // domain_added, user_created, email_sent, etc.
+  details   String?  // JSON as string for SQLite
+  ipAddress String?  @map("ip_address")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
