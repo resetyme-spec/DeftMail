@@ -22,5 +22,5 @@ export function verifyToken(token: string): JWTPayload {
 export function generateRefreshToken(): string {
   return jwt.sign({ type: 'refresh' }, JWT_SECRET, { 
     expiresIn: process.env.REFRESH_TOKEN_EXPIRY || '7d' 
-  })
+  }) as string
 }
