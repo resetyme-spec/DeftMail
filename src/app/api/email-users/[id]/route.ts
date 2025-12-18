@@ -4,9 +4,10 @@ import { EmailUserService } from '@/services/email-user.service'
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const token = request.headers.get('cookie')?.split('token=')[1]?.split(';')[0]
 
     if (!token) {
@@ -14,7 +15,7 @@ export async function DELETE(
     }
 
     const payload = verifyToken(token)
-    await EmailUserService.deleteEmailUser(params.id, payload.tenantId)
+    await EmailUserService.deleteEmailUser(id, payload.tenantId)
 
     return NextResponse.json({ success: true })
   } catch (error: any) {
