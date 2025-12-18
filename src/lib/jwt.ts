@@ -11,11 +11,12 @@ export interface JWTPayload {
 }
 
 export function generateToken(payload: JWTPayload): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRY })
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRY }) as string
 }
 
 export function verifyToken(token: string): JWTPayload {
-  return jwt.verify(token, JWT_SECRET) as JWTPayload
+  const decoded = jwt.verify(token, JWT_SECRET)
+  return decoded as JWTPayload
 }
 
 export function generateRefreshToken(): string {
